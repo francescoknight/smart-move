@@ -6,7 +6,7 @@ reg add "HKCU\Software\Classes\Directory\Background\shell\SmartMovePaste" /ve /d
 reg add "HKCU\Software\Classes\Directory\Background\shell\SmartMovePaste\command" /ve /d "\"%~dp0SmartMove.exe\" --paste \"%%V\"" /f >nul
 rem Processo residente (Ctrl+V) all'avvio di Windows
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v SmartMove /d "\"%~dp0SmartMove.exe\" --tray" /f >nul
-start "" "%~dp0SmartMove.exe" --tray
+if /i not "%~1"=="nostart" start "" "%~dp0SmartMove.exe" --tray
 echo.
 echo Installato:
 echo   - Ctrl+V in Esplora file e sul Desktop (processo residente nell'area di notifica)

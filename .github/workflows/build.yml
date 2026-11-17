@@ -31,7 +31,7 @@ jobs:
         run: |
           $cwd = (Resolve-Path dist).Path
           Copy-Item dist C:\SmartMoveInst -Recurse
-          cmd /c "C:\SmartMoveInst\install.bat" 2>&1 | Write-Host
+          cmd /c "C:\SmartMoveInst\install.bat nostart" 2>&1 | Write-Host
           $clsid = '{5B7F2C1A-8E34-4D6B-9A52-3C1D0E7F4A19}'
           foreach ($k in "HKCU:\Software\Classes\CLSID\$clsid\InprocServer32",
                          "HKCU:\Software\Classes\Directory\shellex\DragDropHandlers\SmartMove",
@@ -41,7 +41,6 @@ jobs:
             if (-not (Test-Path $k)) { throw "chiave mancante: $k" } else { "OK $k" }
           }
           if (-not (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run").SmartMove) { throw "Run key mancante" }
-          Get-Process SmartMove -ErrorAction SilentlyContinue | ForEach-Object { "tray in esecuzione: PID $($_.Id)" }
       - name: Caricamento DLL via COM (handler menu e drop handler)
         shell: pwsh
         run: |
@@ -55,7 +54,7 @@ jobs:
       - name: Disinstallazione
         shell: pwsh
         run: |
-          cmd /c "C:\SmartMoveInst\uninstall.bat" 2>&1 | Write-Host
+          cmd /c "C:\SmartMoveInst\uninstall.bat nostart" 2>&1 | Write-Host
           foreach ($k in "HKCU:\Software\Classes\Directory\shellex\DragDropHandlers\SmartMove","HKCU:\Software\Classes\Directory\shellex\DropHandler") {
             if (Test-Path $k) { throw "chiave ancora presente: $k" } else { "rimossa $k" }
           }
