@@ -18,7 +18,7 @@ public class SmartMoverTests : IDisposable
         if (created != null) { File.SetCreationTimeUtc(p, created.Value); File.SetLastWriteTimeUtc(p, created.Value); }
         return p;
     }
-    SmartMover M(IConflictPrompt p, SmartMoveOptions? o = null) => new(o ?? new(), p);
+    SmartMover M(IConflictPrompt p, SmartMoveOptions? o = null) => new(o ?? new() { CompareField = TimeField.CreationTime }, p);
     static readonly DateTime T = new(2024, 5, 1, 10, 0, 0, DateTimeKind.Utc);
 
     [Fact] public void NoConflict_Moves()
@@ -45,6 +45,15 @@ public class SmartMoverTests : IDisposable
         var r = M(new Fixed(ConflictAction.SmartMove)).Run([f], dst);
         Assert.Equal(1, r.Count(ItemOutcome.MovedRenamed)); Assert.True(File.Exists(Path.Combine(dst, "a_2.jpg")));
     }
+    [Fact] public void Smart_SizeOnly_IgnoresDates()
+    {
+        var f = W(src, "a.jpg", "same", T); W(dst, "a.jpg", "same", T.AddDays(30));
+        var r = M(new Fixed(ConflictAction.SmartMove), new() { CompareField = TimeField.None }).Run([f], dst);
+        Assert.Equal(1, r.Count(ItemOutcome.SourceDeletedAsDuplicate));
+        var g = W(src, "b.jpg", "123", T); W(dst, "b.jpg", "1234", T);
+        Assert.Equal(1, M(new Fixed(ConflictAction.SmartMove), new() { CompareField = TimeField.None }).Run([g], dst).Count(ItemOutcome.MovedRenamed));
+    }
+    [Fact] public void DefaultOptions_AreSizeOnly() => Assert.Equal(TimeField.None, new SmartMoveOptions().CompareField);
     [Fact] public void Smart_ToleranceWithin2s_IsDuplicate()
     {
         var f = W(src, "a.jpg", "same", T); W(dst, "a.jpg", "same", T.AddSeconds(1.5));

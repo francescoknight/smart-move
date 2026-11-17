@@ -19,11 +19,15 @@ public enum ConflictAction
 
 public enum ErrorAction { Retry, Skip, Cancel }
 
-public enum TimeField { CreationTime, LastWriteTime }
+/// <summary>None = confronta solo la dimensione in byte.</summary>
+public enum TimeField { None, CreationTime, LastWriteTime }
 
 public sealed class SmartMoveOptions
 {
-    public TimeField CompareField { get; set; } = TimeField.CreationTime;
+    /// <summary>Versione del file di configurazione (2 = confronto solo sulla dimensione).</summary>
+    public int ConfigVersion { get; set; } = 2;
+    /// <summary>Oltre alla dimensione: None (solo dimensione, predefinito), CreationTime o LastWriteTime.</summary>
+    public TimeField CompareField { get; set; } = TimeField.None;
     /// <summary>Tolleranza in secondi (FAT/exFAT/NAS hanno risoluzione di 2 s).</summary>
     public double ToleranceSeconds { get; set; } = 2.0;
     /// <summary>Duplicati eliminati / origini dei move: Cestino (recuperabile) invece di cancellazione definitiva.</summary>

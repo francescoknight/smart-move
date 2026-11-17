@@ -206,6 +206,7 @@ public sealed class SmartMover
     public bool IsSameFile(FileInfo a, FileInfo b)
     {
         if (a.Length != b.Length) return false;
+        if (_opt.CompareField == TimeField.None) return true;   // solo dimensione esatta in byte
         var ta = _opt.CompareField == TimeField.CreationTime ? a.CreationTimeUtc : a.LastWriteTimeUtc;
         var tb = _opt.CompareField == TimeField.CreationTime ? b.CreationTimeUtc : b.LastWriteTimeUtc;
         return Math.Abs((ta - tb).TotalSeconds) <= _opt.ToleranceSeconds;

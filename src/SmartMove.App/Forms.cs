@@ -96,7 +96,7 @@ sealed class ConflictForm : Form
             b.Click += (_, _) => { Action = a; Close(); };
             Controls.Add(b); y += 34;
         }
-        B("★ Smart: se identico (nome, dimensione, data) elimina l'origine; altrimenti sposta come _2, _3…", ConflictAction.SmartMove, true);
+        B("★ Smart: se ha la stessa dimensione in byte elimina l'origine; altrimenti sposta come _2, _3…", ConflictAction.SmartMove, true);
         B("Sostituisci il file nella destinazione", ConflictAction.Overwrite);
         B("Ignora il file (resta nell'origine)", ConflictAction.Skip);
         B("Sostituisci solo se l'origine è più recente", ConflictAction.OverwriteIfNewer);

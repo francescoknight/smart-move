@@ -13,7 +13,7 @@ Gestore di copia/spostamento in stile TeraCopy per Esplora file, con la regola *
 Trascinando col sinistro: Ctrl = copia, Maiusc = sposta, altrimenti stesso disco = sposta, disco diverso = copia (come Esplora).
 
 ### Regola Smart Move (nel dialogo di conflitto)
-Stesso nome nella destinazione: se **stessa dimensione e stessa data di creazione** (tolleranza 2 s) l'origine viene eliminata (Cestino); altrimenti l'origine viene spostata come `nome_2.ext`, `_3`, `_4`… In copia, un file identico semplicemente non viene ricopiato.
+Stesso nome nella destinazione: se ha **la stessa dimensione esatta in byte** (la data non conta; in `config.json` `CompareField` può essere `CreationTime` o `LastWriteTime` per controllare anche la data, tolleranza 2 s) l'origine viene eliminata (Cestino); altrimenti l'origine viene spostata come `nome_2.ext`, `_3`, `_4`… In copia, un file identico semplicemente non viene ricopiato.
 
 ### Opzioni come in Windows
 - Conflitto: **Sostituisci**, **Ignora**, **Scegli i file da conservare** (origine/destinazione/entrambi → `nome (2).ext`), più *Sostituisci se più recente*, *Smart* e **"Esegui per tutti"**.

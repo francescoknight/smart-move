@@ -74,7 +74,13 @@ static class Program
     {
         try
         {
-            if (File.Exists(ConfigPath)) return JsonSerializer.Deserialize<SmartMoveOptions>(File.ReadAllText(ConfigPath), Json) ?? new();
+            if (File.Exists(ConfigPath))
+            {
+                var text = File.ReadAllText(ConfigPath);
+                // vecchio file senza ConfigVersion: il confronto per data non era voluto -> riparti dai nuovi predefiniti
+                if (text.Contains("\"ConfigVersion\"")) return JsonSerializer.Deserialize<SmartMoveOptions>(text, Json) ?? new();
+                File.Copy(ConfigPath, ConfigPath + ".old", true);
+            }
             Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
             File.WriteAllText(ConfigPath, JsonSerializer.Serialize(new SmartMoveOptions(), Json));
         }
