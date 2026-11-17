@@ -1,0 +1,17 @@
+name: build
+on: [push, workflow_dispatch]
+jobs:
+  win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet test tests/SmartMove.Tests
+      - run: dotnet publish src/SmartMove.App -c Release -r win-x64 --self-contained false -o dist
+      - run: g++ -O2 -std=c++17 -shared -static -static-libgcc -static-libstdc++ -o dist/SmartMoveShell.dll shell/SmartMoveShell.cpp shell/SmartMoveShell.def -lole32 -lshell32 -lshlwapi -luuid -Wl,--kill-at
+        shell: bash
+      - run: cp install.bat install_drop.bat uninstall.bat uninstall_drop.bat dist/
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with: { name: SmartMove, path: dist }
