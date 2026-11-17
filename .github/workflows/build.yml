@@ -1,5 +1,7 @@
 name: build
 on: [push, workflow_dispatch]
+permissions:
+  contents: write
 jobs:
   win:
     runs-on: windows-latest
@@ -11,10 +13,14 @@ jobs:
       - run: dotnet publish src/SmartMove.App -c Release -r win-x64 --self-contained false -o dist
       - run: g++ -O2 -std=c++17 -shared -static -static-libgcc -static-libstdc++ -o dist/SmartMoveShell.dll shell/SmartMoveShell.cpp shell/SmartMoveShell.def -lole32 -lshell32 -lshlwapi -luuid -Wl,--kill-at
         shell: bash
-      - run: cp install.bat install_drop.bat uninstall.bat uninstall_drop.bat dist/
+      - run: cp install.bat install_drop.bat uninstall.bat uninstall_drop.bat update.bat update.ps1 dist/
         shell: bash
       - uses: actions/upload-artifact@v4
         with: { name: SmartMove, path: dist }
+
+      - name: Zip per il download
+        shell: pwsh
+        run: Compress-Archive -Path dist\* -DestinationPath SmartMove.zip
 
       # ---- prova reale su Windows ----
       - name: Selftest motore (stesso volume e tra volumi diversi)
@@ -51,6 +57,23 @@ jobs:
             "creato $c : $($o -ne $null)"
           }
           if (-not (Test-Path "HKCU:\Software\Classes\Directory\shellex\DropHandler")) { throw "DropHandler non registrato" }
+      - name: Pubblica release 'latest'
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>$null
+          gh release create latest SmartMove.zip update.bat update.ps1 --title "Ultima versione" --notes "Versione automatica del commit ${{ github.sha }}. Per aggiornare usa update.bat."
+      - name: Prova aggiornamento automatico (update.bat sull'installazione)
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env: { SMARTMOVE_CI: "1" }
+        run: |
+          Copy-Item update.bat C:\SmartMoveInst\update.bat -Force
+          cmd /c "C:\SmartMoveInst\update.bat" 2>&1 | Write-Host
+          if ($LASTEXITCODE -ne 0) { throw "update.bat fallito" }
+          if (-not (Test-Path C:\SmartMoveInst\SmartMove.exe)) { throw "exe mancante dopo update" }
+          if (-not (Test-Path HKCU:\Software\Classes\Directory\shellex\DragDropHandlers\SmartMove)) { throw "registrazione persa dopo update" }
       - name: Disinstallazione
         shell: pwsh
         run: |

@@ -41,3 +41,8 @@ Configurazione: `%APPDATA%\SmartMove\config.json` (`CompareField`, `ToleranceSec
 ## Stato di verifica
 - **Verificato qui (Linux):** motore (`SmartMove.Core`) con 23 test xUnit; compilazione completa del codice C# dell'app (targeting pack Windows); compilazione della DLL con mingw-w64.
 - **Mai eseguito su Windows:** hook Ctrl+V, drop handler, handler tasto destro, finestre WinForms, CopyFileEx, Cestino. Aspettati correzioni al primo test reale. Il workflow CI compila su `windows-latest` ma non testa l'interfaccia.
+
+## Aggiornamenti
+Ogni modifica passa dai test su Windows e viene pubblicata in https://github.com/francescoknight/smart-move/releases/tag/latest.
+Per aggiornare: doppio clic su `update.bat` (nella cartella di SmartMove.exe) oppure icona nell'area di notifica → **Cerca aggiornamenti**.
+Lo script chiude Smart Move, sostituisce i file (la DLL usata da Esplora viene rinominata), registra i componenti e riavvia Esplora file solo se la DLL è cambiata.

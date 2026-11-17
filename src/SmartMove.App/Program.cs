@@ -105,6 +105,12 @@ sealed class TrayContext : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add(toggle);
         menu.Items.Add("Apri configurazione", null, (_, _) => System.Diagnostics.Process.Start("notepad.exe", Program.ConfigPath));
+        menu.Items.Add("Cerca aggiornamenti", null, (_, _) =>
+        {
+            var bat = Path.Combine(AppContext.BaseDirectory, "update.bat");
+            if (File.Exists(bat)) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(bat) { UseShellExecute = true, WorkingDirectory = AppContext.BaseDirectory });
+            else MessageBox.Show("update.bat non trovato nella cartella del programma.", "Smart Move");
+        });
         menu.Items.Add("Esci", null, (_, _) => { _icon!.Visible = false; ExitThread(); });
         _icon = new NotifyIcon { Icon = SystemIcons.Application, Text = "Smart Move", Visible = true, ContextMenuStrip = menu };
     }
