@@ -4,6 +4,25 @@ using System.Text;
 
 namespace SmartMove.App;
 
+static class Log
+{
+    static readonly object L = new();
+    public static string PathFile => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SmartMove", "log.txt");
+    public static void Write(string m)
+    {
+        try
+        {
+            lock (L)
+            {
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(PathFile)!);
+                var fi = new FileInfo(PathFile); if (fi.Exists && fi.Length > 200_000) fi.Delete();
+                File.AppendAllText(PathFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {m}{Environment.NewLine}");
+            }
+        }
+        catch { }
+    }
+}
+
 /// <summary>Intercetta Ctrl+V in Esplora file. La callback fa solo controlli veloci e posta il lavoro altrove.</summary>
 sealed class KeyboardHook : IDisposable
 {
@@ -39,6 +58,7 @@ sealed class KeyboardHook : IDisposable
         _proc = Callback;
         using var m = Process.GetCurrentProcess().MainModule!;
         _h = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(m.ModuleName), 0);
+        Log.Write(_h == IntPtr.Zero ? $"HOOK tastiera NON installato (errore {Marshal.GetLastWin32Error()})" : "HOOK tastiera installato");
     }
 
     IntPtr Callback(int code, IntPtr w, IntPtr l)
@@ -50,10 +70,15 @@ sealed class KeyboardHook : IDisposable
                 var k = Marshal.PtrToStructure<KBD>(l);
                 if (k.vk == VK_V && k.extra != Marker
                     && (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 && (GetAsyncKeyState(VK_SHIFT) & 0x8000) == 0 && (GetAsyncKeyState(VK_MENU) & 0x8000) == 0
-                    && ShouldHandle(out var hwnd))
+                    )
                 {
-                    ThreadPool.QueueUserWorkItem(_ => PasteRequested?.Invoke(hwnd));
-                    return (IntPtr)1;   // inghiotte Ctrl+V: lo incolla Smart Move
+                    bool handle = ShouldHandle(out var hwnd, out var why);
+                    ThreadPool.QueueUserWorkItem(_ => Log.Write("Ctrl+V: " + (handle ? "intercettato" : "lasciato a Esplora (" + why + ")")));
+                    if (handle)
+                    {
+                        ThreadPool.QueueUserWorkItem(_ => PasteRequested?.Invoke(hwnd));
+                        return (IntPtr)1;   // inghiotte Ctrl+V: lo incolla Smart Move
+                    }
                 }
             }
         }
@@ -61,22 +86,24 @@ sealed class KeyboardHook : IDisposable
         return CallNextHookEx(_h, code, w, l);
     }
 
-    static bool ShouldHandle(out IntPtr hwnd)
+    static bool ShouldHandle(out IntPtr hwnd, out string why)
     {
+        why = "";
         hwnd = GetForegroundWindow();
-        if (hwnd == IntPtr.Zero) return false;
+        if (hwnd == IntPtr.Zero) { why = "nessuna finestra attiva"; return false; }
         var sb = new StringBuilder(64); GetClassName(hwnd, sb, 64);
         var cls = sb.ToString();
-        if (cls != "CabinetWClass" && cls != "Progman" && cls != "WorkerW") return false;
+        if (cls != "CabinetWClass" && cls != "Progman" && cls != "WorkerW") { why = "finestra attiva non è Esplora: " + cls; return false; }
         var tid = GetWindowThreadProcessId(hwnd, out _);
         var gi = new GUITHREADINFO { cbSize = Marshal.SizeOf<GUITHREADINFO>() };
         if (GetGUIThreadInfo(tid, ref gi) && gi.focus != IntPtr.Zero)
         {
             var f = new StringBuilder(64); GetClassName(gi.focus, f, 64);
             var fc = f.ToString();
-            if (fc.Contains("Edit", StringComparison.OrdinalIgnoreCase) || fc.Contains("ComboBox") || fc.Contains("Search")) return false; // rinomina, barra indirizzi
+            if (fc.Contains("Edit", StringComparison.OrdinalIgnoreCase) || fc.Contains("ComboBox") || fc.Contains("Search")) { why = "focus in casella di testo: " + fc; return false; } // rinomina, barra indirizzi
         }
-        return IsClipboardFormatAvailable(CF_HDROP);
+        if (!IsClipboardFormatAvailable(CF_HDROP)) { why = "negli appunti non ci sono file"; return false; }
+        return true;
     }
 
     /// <summary>Rimanda a Esplora un Ctrl+V "vero" (contrassegnato, quindi ignorato dal nostro hook).</summary>
@@ -113,11 +140,44 @@ static class ShellFolders
             }
             catch { }
         }
-        // Windows 11 con schede: più cartelle per lo stesso HWND -> ambiguo, lasciamo fare a Esplora
+        Log.Write($"ShellFolders: {matches.Count} cartelle per la finestra {hwnd}: " + string.Join(" | ", matches));
+        // Windows 11 con schede: più cartelle per lo stesso HWND -> scegli la scheda visibile
+        if (matches.Count > 1) { var act = ActiveTab(app, hwnd); if (act != null) matches = new List<string> { act }; }
         if (matches.Count != 1) return null;
         var path = matches[0];
         return Directory.Exists(path) ? path : null;   // scarta cartelle virtuali (Questo PC, Cestino, zip...)
     }
+    /// <summary>Win11: ogni scheda ha una finestra figlia "ShellTabWindowClass"; quella visibile è la scheda attiva.</summary>
+    static string? ActiveTab(dynamic app, IntPtr top)
+    {
+        try
+        {
+            var result = new List<string>();
+            foreach (dynamic w in app.Windows())
+            {
+                try
+                {
+                    if ((long)w.HWND != top.ToInt64()) continue;
+                    var sp = (IServiceProvider2)w;
+                    var sidTop = new Guid("4C96BE40-915C-11CF-99D3-00AA004AE837");   // SID_STopLevelBrowser
+                    var iidSb = new Guid("000214E2-0000-0000-C000-000000000046");     // IShellBrowser
+                    sp.QueryService(ref sidTop, ref iidSb, out var sbObj);
+                    var sb = (IShellBrowserWnd)sbObj;
+                    sb.GetWindow(out var tabWnd);
+                    if (IsWindowVisible(tabWnd)) { string? p = w.Document?.Folder?.Self?.Path; if (p != null) result.Add(p); }
+                }
+                catch { }
+            }
+            Log.Write("ShellFolders: schede visibili = " + result.Count);
+            return result.Count == 1 ? result[0] : null;
+        }
+        catch { return null; }
+    }
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [System.Runtime.InteropServices.ComImport, System.Runtime.InteropServices.Guid("6D5140C1-7436-11CE-8034-00AA006009FA"), System.Runtime.InteropServices.InterfaceType(System.Runtime.InteropServices.ComInterfaceType.InterfaceIsIUnknown)]
+    interface IServiceProvider2 { void QueryService(ref Guid guidService, ref Guid riid, [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Interface)] out object ppv); }
+    [System.Runtime.InteropServices.ComImport, System.Runtime.InteropServices.Guid("000214E2-0000-0000-C000-000000000046"), System.Runtime.InteropServices.InterfaceType(System.Runtime.InteropServices.ComInterfaceType.InterfaceIsIUnknown)]
+    interface IShellBrowserWnd { void GetWindow(out IntPtr phwnd); }
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     static extern int GetClassNameW(IntPtr h, StringBuilder s, int n);
 }

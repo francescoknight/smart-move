@@ -104,6 +104,7 @@ sealed class TrayContext : ApplicationContext
         toggle.CheckedChanged += (_, _) => { _hook.Enabled = toggle.Checked; };
         var menu = new ContextMenuStrip();
         menu.Items.Add(toggle);
+        menu.Items.Add("Apri registro (log)", null, (_, _) => { if (File.Exists(Log.PathFile)) System.Diagnostics.Process.Start("notepad.exe", Log.PathFile); });
         menu.Items.Add("Apri configurazione", null, (_, _) => System.Diagnostics.Process.Start("notepad.exe", Program.ConfigPath));
         menu.Items.Add("Cerca aggiornamenti", null, (_, _) =>
         {
@@ -113,13 +114,17 @@ sealed class TrayContext : ApplicationContext
         });
         menu.Items.Add("Esci", null, (_, _) => { _icon!.Visible = false; ExitThread(); });
         _icon = new NotifyIcon { Icon = SystemIcons.Application, Text = "Smart Move", Visible = true, ContextMenuStrip = menu };
+        _icon.ShowBalloonTip(3000, "Smart Move attivo", "Ctrl+V in Esplora file è gestito da Smart Move.", ToolTipIcon.Info);
+        Log.Write("Smart Move residente avviato");
     }
 
     void OnPaste(IntPtr hwnd)
     {
         string? dest = null; JobRequest? job = null;
-        try { dest = ShellFolders.ForWindow(hwnd); if (dest != null) job = Program.PasteJob(dest); } catch { }
-        if (job == null) { KeyboardHook.PassThroughPaste(); return; }   // non sappiamo gestirlo: ci pensa Esplora
+        try { dest = ShellFolders.ForWindow(hwnd); if (dest != null) job = Program.PasteJob(dest); }
+        catch (Exception ex) { Log.Write("Errore nel trovare la cartella: " + ex.Message); }
+        if (job == null) { Log.Write($"Ctrl+V: cartella={(dest ?? "non trovata")} -> passo a Esplora"); KeyboardHook.PassThroughPaste(); return; }   // non sappiamo gestirlo: ci pensa Esplora
+        Log.Write($"Ctrl+V: {job.Op} di {job.Sources.Count} elementi in {dest}");
         _svc.Enqueue(job);
     }
 
