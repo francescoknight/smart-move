@@ -251,3 +251,62 @@ public class DuplicateFinderTests : IDisposable
         Assert.Equal(1000, DuplicateFinder.Find(root)[0].Size);
     }
 }
+
+public class DuplicateSelectorTests
+{
+    static readonly DateTime T = new(2024, 5, 1, 10, 0, 0);
+    static FileEntry F(string path, DateTime c, long size = 100) => new(path, Path.GetFileName(path), Path.GetExtension(path).TrimStart('.'), size, c, c);
+    static DupGroup G(params FileEntry[] f) => new() { Size = f[0].Size, Files = f.ToList() };
+
+    [Fact] public void Keeper_AvoidsCopyLikeNames()
+    {
+        var k = DuplicateSelector.PickKeeper(new[] { F("/a/img (2).jpg", T), F("/a/img - Copia.jpg", T), F("/a/img_2.jpg", T), F("/b/img.jpg", T) });
+        Assert.Equal("/b/img.jpg", k.Path);
+    }
+    [Fact] public void Keeper_OldestThenShortestPath()
+    {
+        Assert.Equal("/x/b.jpg", DuplicateSelector.PickKeeper(new[] { F("/x/a.jpg", T.AddDays(1)), F("/x/b.jpg", T) }).Path);
+        Assert.Equal("/a.jpg", DuplicateSelector.PickKeeper(new[] { F("/long/path/a.jpg", T), F("/a.jpg", T) }).Path);
+    }
+    [Fact] public void SafeDeletes_OnlySameCreationDate()
+    {
+        var g = G(F("/1/a.jpg", T), F("/2/a.jpg", T.AddSeconds(1)), F("/3/a.jpg", T.AddDays(5)));
+        var d = DuplicateSelector.SafeDeletes(g);
+        Assert.Single(d); Assert.DoesNotContain(d, f => f.Path == "/3/a.jpg");   // quella con data diversa NON è sicura
+    }
+    [Fact] public void SafeDeletes_NoneWhenAllDatesDiffer() =>
+        Assert.Empty(DuplicateSelector.SafeDeletes(G(F("/1/a", T), F("/2/a", T.AddDays(1)), F("/3/a", T.AddDays(2)))));
+    [Fact] public void SafeDeletes_TwoClusters_KeepsOneEach()
+    {
+        var g = G(F("/1/a", T), F("/2/a", T), F("/3/a", T.AddDays(9)), F("/4/a", T.AddDays(9)));
+        Assert.Equal(2, DuplicateSelector.SafeDeletes(g).Count);
+    }
+    [Fact] public void AllDeletes_KeepsExactlyOne()
+    {
+        var g = G(F("/1/a", T), F("/2/a", T.AddDays(1)), F("/3/a", T.AddDays(2)), F("/4/a", T), F("/5/a", T));
+        var d = DuplicateSelector.AllDeletes(g); Assert.Equal(4, d.Count);
+        Assert.Single(g.Files.Except(d));
+    }
+    [Fact] public void EnsureOneKept_ProtectsLastCopy()
+    {
+        var g1 = G(F("/1/a", T), F("/2/a", T)); var g2 = G(F("/1/b", T, 50), F("/2/b", T, 50), F("/3/b", T, 50));
+        var sel = new HashSet<string> { "/1/a", "/2/a", "/1/b" };
+        var (del, adj) = DuplicateSelector.EnsureOneKept(new[] { g1, g2 }, sel);
+        Assert.Equal(1, adj); Assert.Equal(2, del.Count);                // g1: una tenuta; g2: /1/b eliminato
+        Assert.Single(del.Where(f => f.Path.EndsWith("a")));
+    }
+    [Fact] public void Sort_ByCountSizeWasted()
+    {
+        var small5 = G(Enumerable.Range(0, 5).Select(i => F($"/s{i}", T, 10)).ToArray());
+        var big2 = G(F("/b1", T, 1000), F("/b2", T, 1000));
+        Assert.Same(small5, DuplicateSelector.Sort(new[] { big2, small5 }, DupSort.CopyCount)[0]);
+        Assert.Same(big2, DuplicateSelector.Sort(new[] { small5, big2 }, DupSort.FileSize)[0]);
+        Assert.Same(big2, DuplicateSelector.Sort(new[] { small5, big2 }, DupSort.WastedSpace)[0]);   // 1000 > 40
+    }
+    [Fact] public void Without_DropsGroupsUnderTwo()
+    {
+        var g = G(F("/1/a", T), F("/2/a", T), F("/3/a", T));
+        Assert.Single(DuplicateSelector.Without(new[] { g }, new HashSet<string> { "/1/a" })[0].Files.Count == 2 ? new[] { 1 } : new int[0]);
+        Assert.Empty(DuplicateSelector.Without(new[] { g }, new HashSet<string> { "/1/a", "/2/a" }));
+    }
+}

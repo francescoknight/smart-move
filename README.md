@@ -48,4 +48,10 @@ Per aggiornare: doppio clic su `update.bat` (nella cartella di SmartMove.exe) op
 Lo script chiude Smart Move, sostituisce i file (la DLL usata da Esplora viene rinominata), registra i componenti e riavvia Esplora file solo se la DLL è cambiata.
 
 ## Trova foto duplicate
-Tasto destro su una cartella (o sul suo sfondo) → **Trova foto duplicate da questa cartella** (su Win11: "Mostra altre opzioni"). Cerca nelle sottocartelle file con la **stessa dimensione esatta in byte** (file vuoti ignorati; per default solo immagini, deselezionabile). Il riepilogo mostra nome, estensione, dimensione, data di creazione/modifica e cartella; i gruppi con data di creazione o estensione diverse sono evidenziati in arancio, quelli con la stessa data in verde. Doppio clic = mostra il file in Esplora; esportazione CSV. Non cancella nulla.
+Tasto destro su una cartella (o sul suo sfondo) → **Trova foto duplicate da questa cartella** (su Win11: "Mostra altre opzioni"). Cerca nelle sottocartelle file con la **stessa dimensione esatta in byte** (file vuoti ignorati; per default solo immagini).
+
+- **Blocchi:** ogni gruppo di copie è un blocco con intestazione ("BLOCCO 3 — 5 copie × 2,3 MB — recuperabili 9,2 MB"), comprimibile. Ordinabili per spazio recuperabile, dimensione del file, numero di copie o nome.
+- **Evidenziazione:** arancio = data di creazione o estensione diversa; verde = stessa data. La colonna *Stato* dice "★ originale consigliato", "doppione sicuro" o "solo stessa dimensione".
+- **Selezione:** caselle su ogni file, menu *Seleziona* (duplicati sicuri / tutti i duplicati / tutto / niente / inverti), tasto destro per spuntare le righe selezionate o un intero blocco tranne l'originale consigliato, Spazio per spuntare, Ctrl+A.
+- **Eliminazione (sempre nel Cestino, con conferma):** *Elimina duplicati SICURI* (stessa dimensione + stessa data di creazione), *Elimina TUTTI i duplicati* (solo dimensione), *Elimina spuntati*. In ogni blocco resta sempre almeno una copia. L'originale consigliato evita nomi tipo `(2)`, `_2`, `- Copia`, poi la data più vecchia, poi il percorso più corto.
+- Doppio clic = mostra nella cartella; esportazione CSV.
