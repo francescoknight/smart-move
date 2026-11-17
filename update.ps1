@@ -16,7 +16,8 @@ try {
 
     # La DLL è caricata da Esplora: si può rinominare ma non sovrascrivere.
     $oldDll = Join-Path $dir 'SmartMoveShell.dll'; $newDll = "$tmp\new\SmartMoveShell.dll"
-    $dllChanged = (-not (Test-Path $oldDll)) -or ((Get-FileHash $oldDll).Hash -ne (Get-FileHash $newDll).Hash)
+    function Hash($f) { $h=[Security.Cryptography.SHA256]::Create(); $b=[IO.File]::ReadAllBytes($f); [BitConverter]::ToString($h.ComputeHash($b)) }
+    $dllChanged = (-not (Test-Path $oldDll)) -or ((Hash $oldDll) -ne (Hash $newDll))
 
     Write-Host '3/5 Sostituisco i file...'
     if ($dllChanged -and (Test-Path $oldDll)) { Move-Item $oldDll ("$oldDll.old" + (Get-Random)) -Force }
