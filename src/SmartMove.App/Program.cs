@@ -18,6 +18,13 @@ static class Program
         try
         {
             if (args.Length >= 3 && args[0] == "--selftest") return SelfTest.Run(args[1], args[2]);
+            if (args.Length >= 2 && args[0] == "--dupes")
+            {
+                var dir = args[1].Trim().Trim('"');                    // "C:\" arriva come C:\" per via dell'escape
+                if (!Directory.Exists(dir)) { MessageBox.Show("Cartella non trovata:\n" + dir, "Smart Move"); return 2; }
+                Application.Run(new DupesForm(Path.GetFullPath(dir)));
+                return 0;
+            }
             var opt = LoadOptions();
             if (args.Length >= 1 && args[0] == "--tray")
             {

@@ -203,3 +203,51 @@ public class V2Tests : IDisposable
         Thread.Sleep(100); Assert.NotNull(last); Assert.Equal(5000, last!.BytesTotal);
     }
 }
+
+public class DuplicateFinderTests : IDisposable
+{
+    readonly string root = Path.Combine(Path.GetTempPath(), "sd_" + Guid.NewGuid().ToString("N"));
+    public DuplicateFinderTests() => Directory.CreateDirectory(Path.Combine(root, "sub"));
+    public void Dispose() { try { Directory.Delete(root, true); } catch { } }
+    string W(string rel, int size, DateTime? created = null)
+    {
+        var p = Path.Combine(root, rel); File.WriteAllBytes(p, new byte[size]);
+        if (created != null) File.SetCreationTime(p, created.Value); return p;
+    }
+    static readonly DateTime T = new(2024, 5, 1, 10, 0, 0);
+
+    [Fact] public void FindsGroupsBySizeOnly_AcrossSubfolders()
+    {
+        W("a.jpg", 100, T); W("sub/b.jpg", 100, T); W("c.jpg", 200); W("sub/d.png", 300);
+        var g = DuplicateFinder.Find(root);
+        Assert.Single(g); Assert.Equal(100, g[0].Size); Assert.Equal(2, g[0].Files.Count); Assert.Equal(100, g[0].WastedBytes);
+    }
+    [Fact] public void FlagsDifferentCreationDates()
+    {
+        W("a.jpg", 100, T); W("b.jpg", 100, T.AddDays(3));
+        var g = DuplicateFinder.Find(root).Single(); Assert.True(g.CreatedDiffer);
+    }
+    [Fact] public void SameDates_NotFlagged()
+    {
+        W("a.jpg", 100, T); W("b.jpg", 100, T.AddSeconds(1));
+        Assert.False(DuplicateFinder.Find(root).Single().CreatedDiffer);
+    }
+    [Fact] public void FlagsDifferentExtensions()
+    {
+        W("a.jpg", 100, T); W("b.png", 100, T);
+        var g = DuplicateFinder.Find(root).Single(); Assert.True(g.ExtensionsDiffer);
+    }
+    [Fact] public void ImageFilter_And_NonRecursive_And_EmptyFilesIgnored()
+    {
+        W("a.jpg", 100, T); W("b.txt", 100, T); W("e1.jpg", 0); W("e2.jpg", 0); W("sub/c.jpg", 100, T);
+        Assert.Single(DuplicateFinder.Find(root, extensions: DuplicateFinder.ImageExtensions).Single().Files.Where(f => f.Extension == "txt").DefaultIfEmpty(), x => x == null);
+        Assert.Equal(2, DuplicateFinder.Find(root, extensions: DuplicateFinder.ImageExtensions).Single().Files.Count);
+        Assert.Equal(3, DuplicateFinder.Find(root).Single().Files.Count);
+        Assert.Equal(2, DuplicateFinder.Find(root, recursive: false).Single().Files.Count);
+    }
+    [Fact] public void SortedByWastedSpace()
+    {
+        W("a1", 10); W("a2", 10); W("b1", 1000); W("b2", 1000);
+        Assert.Equal(1000, DuplicateFinder.Find(root)[0].Size);
+    }
+}

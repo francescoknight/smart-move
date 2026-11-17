@@ -4,6 +4,13 @@ cd /d "%~dp0"
 regsvr32 /s "%~dp0SmartMoveShell.dll" || (echo Registrazione DLL fallita & exit /b 1)
 reg add "HKCU\Software\Classes\Directory\Background\shell\SmartMovePaste" /ve /d "Incolla (Smart Move)" /f >nul
 reg add "HKCU\Software\Classes\Directory\Background\shell\SmartMovePaste\command" /ve /d "\"%~dp0SmartMove.exe\" --paste \"%%V\"" /f >nul
+rem Voce "Trova foto duplicate da questa cartella" (tasto destro su una cartella o sul suo sfondo)
+reg add "HKCU\Software\Classes\Directory\shell\SmartMoveDupes" /ve /d "Trova foto duplicate da questa cartella" /f >nul
+reg add "HKCU\Software\Classes\Directory\shell\SmartMoveDupes" /v Icon /d "\"%~dp0SmartMove.exe\"" /f >nul
+reg add "HKCU\Software\Classes\Directory\shell\SmartMoveDupes\command" /ve /d "\"%~dp0SmartMove.exe\" --dupes \"%%1\"" /f >nul
+reg add "HKCU\Software\Classes\Directory\Background\shell\SmartMoveDupes" /ve /d "Trova foto duplicate da questa cartella" /f >nul
+reg add "HKCU\Software\Classes\Directory\Background\shell\SmartMoveDupes" /v Icon /d "\"%~dp0SmartMove.exe\"" /f >nul
+reg add "HKCU\Software\Classes\Directory\Background\shell\SmartMoveDupes\command" /ve /d "\"%~dp0SmartMove.exe\" --dupes \"%%V\"" /f >nul
 rem Processo residente (Ctrl+V) all'avvio di Windows
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v SmartMove /d "\"%~dp0SmartMove.exe\" --tray" /f >nul
 if /i not "%~1"=="nostart" start "" "%~dp0SmartMove.exe" --tray
@@ -11,5 +18,6 @@ echo.
 echo Installato:
 echo   - Ctrl+V in Esplora file e sul Desktop (processo residente nell'area di notifica)
 echo   - trascinamento col TASTO DESTRO: "Smart Move qui" / "Smart Copy qui"
+echo   - tasto destro su una cartella: "Trova foto duplicate da questa cartella"
 echo   - tasto destro nello sfondo di una cartella: "Incolla (Smart Move)"
 echo Per il trascinamento col TASTO SINISTRO (sperimentale) esegui anche install_drop.bat

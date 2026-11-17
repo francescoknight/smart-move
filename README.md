@@ -46,3 +46,6 @@ Configurazione: `%APPDATA%\SmartMove\config.json` (`CompareField`, `ToleranceSec
 Ogni modifica passa dai test su Windows e viene pubblicata in https://github.com/francescoknight/smart-move/releases/tag/latest.
 Per aggiornare: doppio clic su `update.bat` (nella cartella di SmartMove.exe) oppure icona nell'area di notifica → **Cerca aggiornamenti**.
 Lo script chiude Smart Move, sostituisce i file (la DLL usata da Esplora viene rinominata), registra i componenti e riavvia Esplora file solo se la DLL è cambiata.
+
+## Trova foto duplicate
+Tasto destro su una cartella (o sul suo sfondo) → **Trova foto duplicate da questa cartella** (su Win11: "Mostra altre opzioni"). Cerca nelle sottocartelle file con la **stessa dimensione esatta in byte** (file vuoti ignorati; per default solo immagini, deselezionabile). Il riepilogo mostra nome, estensione, dimensione, data di creazione/modifica e cartella; i gruppi con data di creazione o estensione diverse sono evidenziati in arancio, quelli con la stessa data in verde. Doppio clic = mostra il file in Esplora; esportazione CSV. Non cancella nulla.

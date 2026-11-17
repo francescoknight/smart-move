@@ -43,6 +43,8 @@ jobs:
                          "HKCU:\Software\Classes\Directory\shellex\DragDropHandlers\SmartMove",
                          "HKCU:\Software\Classes\Drive\shellex\DragDropHandlers\SmartMove",
                          "HKCU:\Software\Classes\Directory\Background\shell\SmartMovePaste\command",
+                         "HKCU:\Software\Classes\Directory\shell\SmartMoveDupes\command",
+                         "HKCU:\Software\Classes\Directory\Background\shell\SmartMoveDupes\command",
                          "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run") {
             if (-not (Test-Path $k)) { throw "chiave mancante: $k" } else { "OK $k" }
           }
@@ -78,6 +80,6 @@ jobs:
         shell: pwsh
         run: |
           cmd /c "C:\SmartMoveInst\uninstall.bat nostart" 2>&1 | Write-Host
-          foreach ($k in "HKCU:\Software\Classes\Directory\shellex\DragDropHandlers\SmartMove","HKCU:\Software\Classes\Directory\shellex\DropHandler") {
+          foreach ($k in "HKCU:\Software\Classes\Directory\shellex\DragDropHandlers\SmartMove","HKCU:\Software\Classes\Directory\shellex\DropHandler","HKCU:\Software\Classes\Directory\shell\SmartMoveDupes","HKCU:\Software\Classes\Directory\Background\shell\SmartMoveDupes") {
             if (Test-Path $k) { throw "chiave ancora presente: $k" } else { "rimossa $k" }
           }
