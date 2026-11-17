@@ -17,6 +17,7 @@ static class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         try
         {
+            if (args.Length >= 3 && args[0] == "--selftest") return SelfTest.Run(args[1], args[2]);
             var opt = LoadOptions();
             if (args.Length >= 1 && args[0] == "--tray")
             {
