@@ -103,7 +103,33 @@ sealed class KeyboardHook : IDisposable
             if (fc.Contains("Edit", StringComparison.OrdinalIgnoreCase) || fc.Contains("ComboBox") || fc.Contains("Search")) { why = "focus in casella di testo: " + fc; return false; } // rinomina, barra indirizzi
         }
         if (!IsClipboardFormatAvailable(CF_HDROP)) { why = "negli appunti non ci sono file"; return false; }
+        // Solo TAGLIA+INCOLLA (Ctrl+X, Ctrl+V). La copia (Ctrl+C, Ctrl+V) resta a Windows.
+        if (!ClipboardIsCut()) { why = "copia (Ctrl+C): gestita da Windows"; return false; }
         return true;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern uint RegisterClipboardFormat(string n);
+    [DllImport("user32.dll")] static extern bool OpenClipboard(IntPtr h);
+    [DllImport("user32.dll")] static extern bool CloseClipboard();
+    [DllImport("user32.dll")] static extern IntPtr GetClipboardData(uint f);
+    [DllImport("kernel32.dll")] static extern IntPtr GlobalLock(IntPtr h);
+    [DllImport("kernel32.dll")] static extern bool GlobalUnlock(IntPtr h);
+    static readonly uint CfDropEffect = RegisterClipboardFormat("Preferred DropEffect");
+
+    /// <summary>true se gli appunti contengono file TAGLIATI ("Preferred DropEffect" = MOVE, senza COPY). Lettura veloce; in dubbio false.</summary>
+    static bool ClipboardIsCut()
+    {
+        if (!IsClipboardFormatAvailable(CfDropEffect)) return false;
+        if (!OpenClipboard(IntPtr.Zero)) return false;
+        try
+        {
+            var h = GetClipboardData(CfDropEffect); if (h == IntPtr.Zero) return false;
+            var p = GlobalLock(h); if (p == IntPtr.Zero) return false;
+            try { int v = Marshal.ReadInt32(p); return (v & 2) != 0 && (v & 1) == 0; }
+            finally { GlobalUnlock(h); }
+        }
+        catch { return false; }
+        finally { CloseClipboard(); }
     }
 
     /// <summary>Rimanda a Esplora un Ctrl+V "vero" (contrassegnato, quindi ignorato dal nostro hook).</summary>

@@ -32,6 +32,23 @@ jobs:
           $p = Start-Process "$cwd\SmartMove.exe" -ArgumentList "--selftest","${d}sm_src","C:\sm_dst" -Wait -PassThru
           Get-Content "$cwd\selftest.log"
           if ($p.ExitCode -ne 0) { throw "selftest fallito ($($p.ExitCode))" }
+      - name: Motore nativo di Windows (trascinamenti senza Maiusc)
+        shell: pwsh
+        env: { SMARTMOVE_CI: "1" }
+        run: |
+          $cwd = (Resolve-Path dist).Path
+          $t = "C:\nat"; Remove-Item $t -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory "$t\src","$t\dstcopy","$t\dstmove","$t\dstlnk" | Out-Null
+          Set-Content "$t\src\a.txt" "uno"; Set-Content "$t\src\b.txt" "due"
+          foreach ($case in @(@("copy","dstcopy"),@("move","dstmove"),@("link","dstlnk"))) {
+            $list = "$t\list_$($case[0]).txt"; Set-Content $list @("$t\src\a.txt","$t\src\b.txt") -Encoding UTF8
+            $p = Start-Process "$cwd\SmartMove.exe" -ArgumentList "--job","`"$list`"","`"$t\$($case[1])`"",$case[0],"native" -Wait -PassThru
+            "$($case[0]) esito $($p.ExitCode)"
+          }
+          if (-not ((Test-Path "$t\dstcopy\a.txt") -and (Test-Path "$t\dstcopy\b.txt"))) { throw "copia nativa fallita" }
+          if (-not ((Test-Path "$t\dstmove\a.txt") -and (Test-Path "$t\dstmove\b.txt"))) { throw "spostamento nativo fallito" }
+          if (Test-Path "$t\src\a.txt") { throw "origine non spostata (a.txt ancora presente)" }
+          if (-not (Test-Path "$t\dstlnk\a - Collegamento.lnk")) { throw "collegamento non creato" }
       - name: Installazione (regsvr32 + chiavi di registro)
         shell: pwsh
         run: |

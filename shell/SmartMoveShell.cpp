@@ -169,7 +169,7 @@ static bool GetDropFiles(IDataObject* d, std::vector<std::wstring>& out) {
     return !out.empty();
 }
 
-static bool LaunchJob(const std::vector<std::wstring>& files, const std::wstring& destIn, bool copy) {
+static bool LaunchJob(const std::vector<std::wstring>& files, const std::wstring& destIn, const wchar_t* op, bool native) {
     wchar_t tmpDir[MAX_PATH], tmp[MAX_PATH];
     GetTempPathW(MAX_PATH, tmpDir);
     if (!GetTempFileNameW(tmpDir, L"smv", 0, tmp)) return false;
@@ -186,22 +186,27 @@ static bool LaunchJob(const std::vector<std::wstring>& files, const std::wstring
     std::wstring dest = destIn;
     while (dest.size() > 3 && dest.back() == L'\\') dest.pop_back();
     std::wstring exe = DllDir() + L"\\SmartMove.exe";
-    std::wstring cmd = L"\"" + exe + L"\" --job \"" + tmp + L"\" \"" + dest + L"\" " + (copy ? L"copy" : L"move");
+    std::wstring cmd = L"\"" + exe + L"\" --job \"" + tmp + L"\" \"" + dest + L"\" " + op + (native ? L" native" : L"");
     STARTUPINFOW si = {sizeof si}; PROCESS_INFORMATION pi = {};
     if (!CreateProcessW(exe.c_str(), &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, DllDir().c_str(), &si, &pi)) { DeleteFileW(tmp); return false; }
     CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
     return true;
 }
 
-// Scelta come in Esplora: Ctrl = copia, Maiusc = sposta, altrimenti stesso volume -> sposta, altro volume -> copia.
-// Alt o Ctrl+Maiusc (collegamento) NON sono gestiti: il trascinamento viene rifiutato (vedi README).
+// Come in Esplora: Alt o Ctrl+Maiusc = collegamento, Ctrl = copia, Maiusc = sposta,
+// altrimenti stesso volume -> sposta, altro volume -> copia.
+// SMART MOVE interviene SOLO con Maiusc (spostamento). Tutti gli altri trascinamenti sono eseguiti
+// dal motore di Windows (SHFileOperation, stesse finestre di Esplora) tramite "SmartMove.exe ... native".
+enum class Mode { None, Link, Copy, Move };
 static bool WantsLink(DWORD ks) { return (ks & MK_ALT) || ((ks & MK_CONTROL) && (ks & MK_SHIFT)); }
-static bool ChooseCopy(DWORD ks, const std::wstring& first, const std::wstring& dest) {
-    if (ks & MK_CONTROL) return true;
-    if (ks & MK_SHIFT) return false;
+static bool SmartShiftMove(DWORD ks) { return (ks & MK_SHIFT) && !(ks & MK_CONTROL) && !(ks & MK_ALT); }
+static Mode ChooseMode(DWORD ks, const std::wstring& first, const std::wstring& dest) {
+    if (WantsLink(ks)) return Mode::Link;
+    if (ks & MK_CONTROL) return Mode::Copy;
+    if (ks & MK_SHIFT) return Mode::Move;
     bool sameVol = first.size() > 1 && dest.size() > 1 && first[1] == L':' && dest[1] == L':' &&
                    towupper(first[0]) == towupper(dest[0]);
-    return !sameVol;   // percorsi UNC: stessa regola (copia)
+    return sameVol ? Mode::Move : Mode::Copy;
 }
 
 class SmartMoveDrop : public IDropTarget {
@@ -220,8 +225,9 @@ public:
     STDMETHODIMP_(ULONG) Release() override { long r = InterlockedDecrement(&ref_); if (!r) delete this; return r; }
 
     void Effect(DWORD ks, DWORD* eff) {
-        if (!hdrop_ || WantsLink(ks)) { *eff = DROPEFFECT_NONE; return; }
-        *eff = ChooseCopy(ks, first_, dest_) ? DROPEFFECT_COPY : DROPEFFECT_MOVE;
+        if (!hdrop_) { *eff = DROPEFFECT_NONE; return; }
+        Mode m = ChooseMode(ks, first_, dest_);
+        *eff = m == Mode::Link ? DROPEFFECT_LINK : m == Mode::Copy ? DROPEFFECT_COPY : DROPEFFECT_MOVE;
     }
     STDMETHODIMP DragEnter(IDataObject* d, DWORD ks, POINTL, DWORD* eff) override {
         std::vector<std::wstring> v;
@@ -234,9 +240,11 @@ public:
     STDMETHODIMP Drop(IDataObject* d, DWORD ks, POINTL, DWORD* eff) override {
         try {
             std::vector<std::wstring> v;
-            if (!d || WantsLink(ks) || !GetDropFiles(d, v)) { *eff = DROPEFFECT_NONE; return S_OK; }
-            bool copy = ChooseCopy(ks, v[0], dest_);
-            if (!LaunchJob(v, dest_, copy)) { *eff = DROPEFFECT_NONE; return S_OK; }
+            if (!d || !GetDropFiles(d, v)) { *eff = DROPEFFECT_NONE; return S_OK; }
+            Mode m = ChooseMode(ks, v[0], dest_);
+            bool smart = SmartShiftMove(ks);
+            const wchar_t* op = m == Mode::Link ? L"link" : m == Mode::Copy ? L"copy" : L"move";
+            if (!LaunchJob(v, dest_, op, !smart)) { *eff = DROPEFFECT_NONE; return S_OK; }
             // SICUREZZA: il motore sposta in modo asincrono. Se dichiarassimo MOVE, Esplora (origine) potrebbe
             // cancellare gli originali mentre copiamo. Dichiariamo quindi sempre COPY e segnaliamo
             // "PerformedDropEffect = NONE" (best effort); lo spostamento reale lo fa SmartMove.exe.
@@ -245,7 +253,7 @@ public:
             STGMEDIUM sm = {}; sm.tymed = TYMED_HGLOBAL; sm.hGlobal = GlobalAlloc(GMEM_MOVEABLE, sizeof(DWORD));
             if (sm.hGlobal) { DWORD* p = (DWORD*)GlobalLock(sm.hGlobal); *p = DROPEFFECT_NONE; GlobalUnlock(sm.hGlobal);
                 if (FAILED(d->SetData(&fe, &sm, TRUE))) GlobalFree(sm.hGlobal); }
-            *eff = DROPEFFECT_COPY;
+            *eff = m == Mode::Link ? DROPEFFECT_LINK : DROPEFFECT_COPY;
             return S_OK;
         } catch (...) { *eff = DROPEFFECT_NONE; return E_FAIL; }
     }

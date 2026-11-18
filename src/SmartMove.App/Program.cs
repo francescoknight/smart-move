@@ -33,6 +33,7 @@ static class Program
                 Application.Run(new TrayContext(opt));
                 return 0;
             }
+            if (args.Length >= 5 && args[0] == "--job" && args[4] == "native") return NativeOps.Run(args[1], args[2], args[3]);
             JobRequest? job = ParseJob(args);
             if (job == null) { MessageBox.Show("Smart Move si usa da Esplora file (trascinamento / Ctrl+V).\nAvvia 'SmartMove.exe --tray' o esegui install.bat.", "Smart Move"); return 2; }
             if (JobService.TrySendToRunning(job)) return 0;     // il processo residente prende in carico il lavoro
@@ -130,6 +131,7 @@ sealed class TrayContext : ApplicationContext
         string? dest = null; JobRequest? job = null;
         try { dest = ShellFolders.ForWindow(hwnd); if (dest != null) job = Program.PasteJob(dest); }
         catch (Exception ex) { Log.Write("Errore nel trovare la cartella: " + ex.Message); }
+        if (job != null && job.Op != Operation.Move) { Log.Write("Ctrl+V: non è un taglia -> passo a Esplora"); job = null; }
         if (job == null) { Log.Write($"Ctrl+V: cartella={(dest ?? "non trovata")} -> passo a Esplora"); KeyboardHook.PassThroughPaste(); return; }   // non sappiamo gestirlo: ci pensa Esplora
         Log.Write($"Ctrl+V: {job.Op} di {job.Sources.Count} elementi in {dest}");
         _svc.Enqueue(job);

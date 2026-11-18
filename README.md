@@ -3,14 +3,18 @@
 Gestore di copia/spostamento in stile TeraCopy per Esplora file, con la regola **Smart Move** e tutte le opzioni della copia di Windows.
 
 ## Cosa fa
-| Azione in Esplora | Gestita da Smart Move | Come |
-|---|---|---|
-| **Ctrl+V** (incolla copiati/tagliati) | ✔ | processo residente con hook tastiera |
-| Tasto destro → *Incolla (Smart Move)* | ✔ | voce di menu (su Win11: "Mostra altre opzioni") |
-| Trascinamento **tasto destro** → *Smart Move qui / Smart Copy qui* | ✔ | handler di trascinamento |
-| Trascinamento **tasto sinistro** su una cartella | ✔ (sperimentale) | drop handler, `install_drop.bat` |
+Smart Move interviene **solo sullo spostamento**. La copia resta a Windows.
 
-Trascinando col sinistro: Ctrl = copia, Maiusc = sposta, altrimenti stesso disco = sposta, disco diverso = copia (come Esplora).
+| In Esplora | Gestita da | Come |
+|---|---|---|
+| **Ctrl+X → Ctrl+V** (taglia e incolla) | Smart Move | processo residente con hook tastiera |
+| **Ctrl+C → Ctrl+V** (copia) | Windows | l'hook controlla gli appunti e lascia passare |
+| **Maiusc + trascinamento** su una cartella | Smart Move (sperimentale) | drop handler, `install_drop.bat` |
+| Trascinamento normale / Ctrl / Alt su una cartella | Windows (stesso motore di Esplora, `SHFileOperation`) | il drop handler lancia `SmartMove.exe ... native` |
+| Trascinamento **tasto destro** → *Smart Move qui / Smart Copy qui* | Smart Move | voci esplicite del menu |
+| Tasto destro nello sfondo → *Incolla (Smart Move)* | Smart Move | voce esplicita |
+
+Nota: con `install_drop.bat` il drop handler sostituisce quello di Windows per **tutti** i trascinamenti sulle cartelle. Per non cambiarne il comportamento, quelli senza Maiusc sono rieseguiti dal motore nativo di Windows (stesse finestre di conferma). Se noti differenze: `uninstall_drop.bat` ripristina tutto.
 
 ### Regola Smart Move (nel dialogo di conflitto)
 Stesso nome nella destinazione: se ha **la stessa dimensione esatta in byte** (la data non conta; in `config.json` `CompareField` può essere `CreationTime` o `LastWriteTime` per controllare anche la data, tolleranza 2 s) l'origine viene eliminata (Cestino); altrimenti l'origine viene spostata come `nome_2.ext`, `_3`, `_4`… In copia, un file identico semplicemente non viene ricopiato.
